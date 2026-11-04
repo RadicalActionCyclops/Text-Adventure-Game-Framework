@@ -541,6 +541,54 @@ class Image:
 
 ## Places, Playables, and General Classes
 
+"""
+
+"""
+class PlayerUpdater:
+    def __init__(self, variable, value, operation="set", key=None):
+        self.variable = variable
+        self.value = value
+        self.operation = operation
+        self.key = key
+
+    def do(self, player, place):
+        if not hasattr(player, self.variable):
+            raise AttributeError(f"Player has no variable '{self.variable}'")
+
+        current = getattr(player, self.variable)
+
+        if isinstance(current, dict):
+            if self.key is None:
+                raise ValueError("A dictionary key is required.")
+
+            if self.operation in ("set", "add"):
+                current[self.key] = self.value
+            elif self.operation == "remove":
+                current.pop(self.key, None)
+            else:
+                raise ValueError(
+                    f"Operation '{self.operation}' is not supported for dictionaries."
+                )
+
+        elif self.operation == "set":
+            setattr(player, self.variable, self.value)
+
+        elif self.operation == "add":
+            if self.variable == "hp":
+                player.updateHp(self.value)
+            else:
+                setattr(player, self.variable, current + self.value)
+
+        elif self.operation == "subtract":
+            if self.variable == "hp":
+                player.updateHp(-self.value)
+            else:
+                setattr(player, self.variable, current - self.value)
+
+        else:
+            raise ValueError(f"Unsupported operation: {self.operation}")
+
+        return 1
 
 class Knowledge:
     def __init__(self, name: str, world: str, knowledge: str, secretAbout=""):
@@ -551,7 +599,7 @@ class Knowledge:
 
     def do(self, player, place):
         Display(f":t:You realize {self.knowledge}").do(player, place)
-        player.secrets[self.name] = self
+        PlayerUpdater("secrets", self, "add", self.name).do(player, place)
         return 1
 
 
@@ -605,7 +653,7 @@ class Item(TakesInput):
         answer = self.get_valid_input(["y", "n"])
 
         if answer == "y":
-            player.inventory[self.name] = self
+            PlayerUpdater("inventory", self, "add", self.name).do(player, place)
             place.items_in.pop(self.name)
 
         return 1
